@@ -63,12 +63,12 @@ struct WebElements
     }
     
     static 
-    const String textArea(String handler, String title="" )
+    const String textArea(String handler, String title="", int rows=4, int cols=50 )
     {
       return String() +
       "<form action=\"/"+handler+"\" method=\"post\">"
         + title +
-        "<textarea rows=\"4\" cols=\"50\" name=\"text\">"
+        "<textarea rows=\""+rows+"\" cols=\""+cols+"\" name=\""+title+"_text\">"
         "</textarea>"
         "<br>"
         "<button type=\"submit\">Send</button>"

@@ -16,12 +16,56 @@
 	"buffers":
 	[
 		{
+			"contents": "/*\n *  Simple HTTP get webclient test\n */\n \n#include <ESP8266WiFi.h>\n#include <ESP8266WebServer.h>\n#include <pins_arduino.h>\n#include <Servo.h> \n#include \"globals.h\"\n#include \"SoftTasks.hpp\"\n#include \"WebHandlers.hpp\"\n#include \"ServoAux.hpp\"\n#include \"walk.hpp\"\n#include <vector>\n#include <regex>\n\n#define ssid      \"VFNL-FDD180\"\n#define password  \"95K9XSZ8CYHL2\"\n \nESP8266WebServer server(83);\n\nstd::vector<Servo> servos(8);\n\nSoftTasks sTasks;\n\nQuadMove quad(servos,sTasks);\n\nunsigned int cycleCounter = 0;\nunsigned int overshootCounter;\n\n\nvoid setupSerial()\n{\n  Serial.begin(115200);\n  delay(100);\n}\n\nvoid setupServos()\n{\n  servos[0].attach(D1);\n  servos[1].attach(D2);\n  servos[2].attach(D3);\n  servos[3].attach(D4);\n  \n  servos[4].attach(D5);\n  servos[5].attach(D6);\n  servos[6].attach(D7);\n  servos[7].attach(D8);\n}\n\nvoid setupWebServer()\n{\n\n  Serial.println();\n  Serial.println();\n  Serial.print(\"Connecting to \");\n  Serial.println(ssid);\n \n  WiFi.begin(ssid, password);\n \n  //Set a static IP (optional)\n  IPAddress ip(192, 168, 1, 83);\n  IPAddress gateway(192, 168, 1, 1);\n  IPAddress subnet(255, 255, 255, 0);\n  WiFi.config(ip, gateway, subnet);\n\n\n  while (WiFi.status() != WL_CONNECTED) \n  {\n    delay(500);\n    Serial.print(\".\");\n  }\n \n  Serial.println(\"\");\n  Serial.println(\"WiFi connected\"); \n  Serial.println(\"IP address: \");\n  Serial.println(WiFi.localIP());\n\n  static WebHandlers handlers(server);\n\n  server.on(\"/\", [](){handlers.root();});\n  server.on(\"/setServo\", [](){handlers.setServo(servos);});\n  server.on(\"/serverTime\", [](){server.send(200, \"text/html\", String(\"Server Time: \")+(millis()/1000.));});\n  server.on(\"/cycles\", [](){server.send(200, \"text/html\", String(\"Cycles per seccond= \")+ cycleCounter +\"; overshoot= \"+ overshootCounter);});\n  server.onNotFound([](){handlers.notFound();});\n\n  server.on(\"/zero\", [](){quad.setZero();});\n  server.on(\"/one\", [](){quad.setBase();});\n  server.on(\"/fwd\", [](){quad.stepFwd();});\n  server.on(\"/stop\", [](){quad.stop();});\n  server.on(\"/commands\", [](){handlers.parseCommands(&commandInterpreter.go);});\n\n  server.begin();\n  Serial.println(\"Server started\");\n}\n\n\nvoid trackCyclesPerSecond(bool collect)\n{\n  static unsigned int localCycleCounter;\n  if(collect)\n  {\n    overshootCounter = localOvershotCounter;\n    cycleCounter = localCycleCounter;\n    localCycleCounter = 0;\n    localOvershotCounter = 0;\n  }\n  else\n  {\n    localCycleCounter++;\n  }\n}\n\n\n\n\n\n\n//-----------------------------------------------\n\n\nvoid setup() \n{\n  setupSerial();\n  setupWebServer();\n  quad.setZero();\n  setupServos();\n  quad.setZero();\n\n  init_WalkCycle();\n\n  sTasks.add([](){server.handleClient();});\n  sTasks.add([](){trackCyclesPerSecond(false);});//just count\n  sTasks.add([](){trackCyclesPerSecond(true);},1000);//collect\n\n  sTasks.add([](){quad.loop();},100);\n}\n\nvoid loop() {\n  sTasks.loop();\n}\n\n//-----------------------------------------------\n\n",
 			"file": "webServos.ino",
+			"file_size": 2898,
+			"file_write_time": 131920648504295418,
 			"settings":
 			{
-				"buffer_size": 3911,
+				"buffer_size": 2901,
 				"encoding": "UTF-8",
 				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "commandInterpreter.hpp",
+			"settings":
+			{
+				"buffer_size": 1643,
+				"encoding": "UTF-8",
+				"line_ending": "Windows",
+				"name": "commandInterpreter"
+			}
+		},
+		{
+			"file": "commandInterpreter.cpp",
+			"settings":
+			{
+				"buffer_size": 7,
+				"encoding": "UTF-8",
+				"line_ending": "Windows",
+				"name": "command"
+			}
+		},
+		{
+			"file": "globals.h",
+			"settings":
+			{
+				"buffer_size": 83,
+				"encoding": "UTF-8",
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"contents": "#include \"globals.h\"\n\nstruct WalkMove\n{\n  WalkMove()  {}\n  WalkMove(int s0,int s1,int steps)\n    :s0(s0),s1(s1),steps(steps)    {}\n\n  int s0;\n  int s1;\n  int steps;\n};\nstd::vector<WalkMove> walkCycle;\n\nvoid init_WalkCycle()\n{\n  walkCycle.push_back(WalkMove(1000,2000,50));\n  walkCycle.push_back(WalkMove(1100,1900,30));\n  walkCycle.push_back(WalkMove(1200,1800,40));\n  walkCycle.push_back(WalkMove(1300,1700,70));\n  walkCycle.push_back(WalkMove(1400,1600,60));\n  walkCycle.push_back(WalkMove(1500,1500,30));\n  walkCycle.push_back(WalkMove(1400,1600,10));\n  walkCycle.push_back(WalkMove(1300,1700,50));\n  walkCycle.push_back(WalkMove(1200,1800,60));\n  walkCycle.push_back(WalkMove(1100,1900,70));\n}\n\n/*\nvoid moveServos()\n{\n  static unsigned long zeroTime = millis();\n  unsigned int delta = millis()-zeroTime;\n  if(delta>=1000/50)\n  {\n    localOvershotCounter += delta - 1000/50;\n    zeroTime= millis();\n\n    static int posCount = 0, subCount=0;\n\n    for(int i=0; i<4; i++)\n    {\n      int nextCount = posCount + 1;\n      if(nextCount>=walkCycle.size())\n        nextCount = 0;\n\n      int subs = walkCycle[posCount].steps;\n      int p0 = walkCycle[posCount].s0 + ((walkCycle[nextCount].s0 - walkCycle[posCount].s0)*subCount) / subs;\n      int p1 = walkCycle[posCount].s1 + ((walkCycle[nextCount].s1 - walkCycle[posCount].s1)*subCount) / subs;\n      servos[i*2].write(p0);\n      servos[i*2+1].write(p1);\n  \n      //Serial.println(String(\"\") +p0+\", \"+posCount+\"/\"+nextCount+\", \"+subCount);\n\n      subCount++;\n      if(subCount>=subs)\n      {\n        subCount = 0;\n        posCount++;\n      }\n      if(posCount >= walkCycle.size())\n        posCount = 0;\n    }\n  }\n}\n*/",
+			"file": "walk.hpp",
+			"file_size": 1725,
+			"file_write_time": 131920639505179906,
+			"settings":
+			{
+				"buffer_size": 1662,
+				"encoding": "UTF-8",
+				"line_ending": "Windows"
 			}
 		},
 		{
@@ -45,7 +89,7 @@
 			"file": "webElements.hpp",
 			"settings":
 			{
-				"buffer_size": 2622,
+				"buffer_size": 3077,
 				"encoding": "UTF-8",
 				"line_ending": "Windows"
 			}
@@ -54,7 +98,7 @@
 			"file": "webHandlers.hpp",
 			"settings":
 			{
-				"buffer_size": 2139,
+				"buffer_size": 2741,
 				"encoding": "UTF-8",
 				"line_ending": "Windows"
 			}
@@ -117,6 +161,10 @@
 	},
 	"file_history":
 	[
+		"/S/Projects/WemosD1Mini/WebServos/webServos.sublime-workspace",
+		"/S/Projects/WemosD1Mini/WebServos/webServos.sublime-project",
+		"/S/Projects/WemosD1Mini/WebServos/walk.cpp",
+		"/S/Projects/WemosD1Mini/WebServos/ServoAux.cpp",
 		"/C/Users/Santi/AppData/Local/Arduino15/packages/esp8266/hardware/esp8266/2.3.0/variants/d1_mini/pins_arduino.h",
 		"/C/Users/Santi/AppData/Local/Arduino15/packages/esp8266/hardware/esp8266/2.3.0/libraries/Servo/src/Servo.h",
 		"/C/Users/Santi/Documents/Projects/WemosD1Mini/WebServos/ServoAux.cpp",
@@ -147,9 +195,10 @@
 	},
 	"find_in_files":
 	{
-		"height": 0.0,
+		"height": 104.0,
 		"where_history":
 		[
+			""
 		]
 	},
 	"find_state":
@@ -157,6 +206,9 @@
 		"case_sensitive": false,
 		"find_history":
 		[
+			"moveservos",
+			"Move",
+			"moveservos",
 			"Serial",
 			"Task",
 			"CallData",
@@ -191,15 +243,15 @@
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 3911,
+						"buffer_size": 2901,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								291,
-								304
+								1338,
+								1338
 							]
 						],
 						"settings":
@@ -209,7 +261,7 @@
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 54.0,
+						"translation.y": 1033.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 0,
@@ -217,6 +269,123 @@
 				},
 				{
 					"buffer": 1,
+					"file": "commandInterpreter.hpp",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 1643,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								205,
+								205
+							]
+						],
+						"settings":
+						{
+							"auto_name": "commandInterpreter",
+							"syntax": "Packages/C++/C++.sublime-syntax"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"type": "text"
+				},
+				{
+					"buffer": 2,
+					"file": "commandInterpreter.cpp",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 7,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								7,
+								7
+							]
+						],
+						"settings":
+						{
+							"auto_name": "command",
+							"syntax": "Packages/C++/C++.sublime-syntax"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 2,
+					"type": "text"
+				},
+				{
+					"buffer": 3,
+					"file": "globals.h",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 83,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								83,
+								83
+							]
+						],
+						"settings":
+						{
+							"auto_name": "",
+							"syntax": "Packages/C++/C++.sublime-syntax"
+						},
+						"translation.x": 0.0,
+						"translation.y": 81.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 5,
+					"type": "text"
+				},
+				{
+					"buffer": 4,
+					"file": "walk.hpp",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 1662,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								698,
+								698
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/C++/C++.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 48.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 4,
+					"type": "text"
+				},
+				{
+					"buffer": 5,
 					"file": "/C/Users/Santi/AppData/Local/Arduino15/packages/esp8266/hardware/esp8266/2.3.0/variants/d1_mini/pins_arduino.h",
 					"semi_transient": false,
 					"settings":
@@ -228,8 +397,8 @@
 						"selection":
 						[
 							[
-								1230,
-								1230
+								1292,
+								1292
 							]
 						],
 						"settings":
@@ -239,14 +408,14 @@
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 162.0,
+						"translation.y": 288.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 2,
+					"stack_index": 9,
 					"type": "text"
 				},
 				{
-					"buffer": 2,
+					"buffer": 6,
 					"file": "ServoAux.hpp",
 					"semi_transient": false,
 					"settings":
@@ -258,8 +427,8 @@
 						"selection":
 						[
 							[
-								3336,
-								3336
+								3276,
+								3276
 							]
 						],
 						"settings":
@@ -270,27 +439,27 @@
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 2214.0,
+						"translation.y": 2125.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 1,
+					"stack_index": 7,
 					"type": "text"
 				},
 				{
-					"buffer": 3,
+					"buffer": 7,
 					"file": "webElements.hpp",
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 2622,
+						"buffer_size": 3077,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								505,
-								505
+								780,
+								780
 							]
 						],
 						"settings":
@@ -300,27 +469,27 @@
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 3.0,
-						"translation.y": 108.0,
+						"translation.y": 288.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 4,
+					"stack_index": 6,
 					"type": "text"
 				},
 				{
-					"buffer": 4,
+					"buffer": 8,
 					"file": "webHandlers.hpp",
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 2139,
+						"buffer_size": 2741,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								1275,
-								1275
+								1763,
+								1781
 							]
 						],
 						"settings":
@@ -330,14 +499,14 @@
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 378.0,
+						"translation.y": 739.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 3,
 					"type": "text"
 				},
 				{
-					"buffer": 5,
+					"buffer": 9,
 					"file": "SoftTasks.hpp",
 					"semi_transient": false,
 					"settings":
@@ -360,10 +529,10 @@
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 0.0,
+						"translation.y": 624.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 5,
+					"stack_index": 8,
 					"type": "text"
 				}
 			]
@@ -447,9 +616,9 @@
 	{
 	},
 	"show_minimap": true,
-	"show_open_files": false,
+	"show_open_files": true,
 	"show_tabs": true,
-	"side_bar_visible": true,
+	"side_bar_visible": false,
 	"side_bar_width": 150.0,
 	"status_bar_visible": true,
 	"template_settings":

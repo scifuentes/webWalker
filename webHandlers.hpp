@@ -56,7 +56,7 @@ public:
       } 
     }
 
-    void parseCommands(void(*commandInterpreter)(const String&))
+    void parseCommands(std::function<void(const String&)> commandInterpreter)
     {
       server.send(204);
       Serial.println(__func__);

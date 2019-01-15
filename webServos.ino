@@ -6,9 +6,12 @@
 #include <ESP8266WebServer.h>
 #include <pins_arduino.h>
 #include <Servo.h> 
+#include "globals.h"
 #include "SoftTasks.hpp"
 #include "WebHandlers.hpp"
 #include "ServoAux.hpp"
+#include "walk.hpp"
+#include "commandInterpreter.hpp"
 #include <vector>
 #include <regex>
 
@@ -25,7 +28,6 @@ QuadMove quad(servos,sTasks);
 
 unsigned int cycleCounter = 0;
 unsigned int overshootCounter;
-unsigned int localOvershotCounter;
 
 void setupSerial()
 {
@@ -109,106 +111,10 @@ void trackCyclesPerSecond(bool collect)
   }
 }
 
-struct WalkMove
-{
-  WalkMove()  {}
-  WalkMove(int s0,int s1,int steps)
-    :s0(s0),s1(s1),steps(steps)    {}
-
-  int s0;
-  int s1;
-  int steps;
-};
-std::vector<WalkMove> walkCycle;
-
-void init_WalkCycle()
-{
-  walkCycle.push_back(WalkMove(1000,2000,50));
-  walkCycle.push_back(WalkMove(1100,1900,30));
-  walkCycle.push_back(WalkMove(1200,1800,40));
-  walkCycle.push_back(WalkMove(1300,1700,70));
-  walkCycle.push_back(WalkMove(1400,1600,60));
-  walkCycle.push_back(WalkMove(1500,1500,30));
-  walkCycle.push_back(WalkMove(1400,1600,10));
-  walkCycle.push_back(WalkMove(1300,1700,50));
-  walkCycle.push_back(WalkMove(1200,1800,60));
-  walkCycle.push_back(WalkMove(1100,1900,70));
-}
 
 
 
-void commandInterpreter(const String& command)
-{
-  Serial.println(String(__func__)+": "+command);
-  
-  std::vector<int> spaces;
-  int p=-1;
-  do
-  {
-    p=command.indexOf(" ",p+1);
-    if(p>0)
-      spaces.push_back(p);
-  } while(p>0);
 
-  if(command.startsWith("wc.flush"))
-  {
-    walkCycle.clear();
-  }
-  else if(command.startsWith("ws.add"))
-  {
-    Serial.println("ws.add");
-
-    WalkMove move;
-    move.s0=command.substring(spaces[0],spaces[1]).toInt();
-    move.s1=command.substring(spaces[1],spaces[2]).toInt();
-    move.steps=command.substring(spaces[2]).toInt();
-    walkCycle.push_back(move);
-  }
-  else
-  {
-    Serial.println("Unknown command");
-  }
-
-}
-
-
-
-void moveServos()
-{
-  static unsigned long zeroTime = millis();
-  unsigned int delta = millis()-zeroTime;
-  if(delta>=1000/50)
-  {
-    localOvershotCounter += delta - 1000/50;
-    zeroTime= millis();
-
-    static int posCount = 0, subCount=0;
-
-    for(int i=0; i<4; i++)
-    {
-      int nextCount = posCount + 1;
-      if(nextCount>=walkCycle.size())
-        nextCount = 0;
-
-      int subs = walkCycle[posCount].steps;
-      int p0 = walkCycle[posCount].s0 + ((walkCycle[nextCount].s0 - walkCycle[posCount].s0)*subCount) / subs;
-      int p1 = walkCycle[posCount].s1 + ((walkCycle[nextCount].s1 - walkCycle[posCount].s1)*subCount) / subs;
-      servos[i*2].write(p0);
-      servos[i*2+1].write(p1);
-  
-      //Serial.println(String("") +p0+", "+posCount+"/"+nextCount+", "+subCount);
-
-      subCount++;
-      if(subCount>=subs)
-      {
-        subCount = 0;
-        posCount++;
-      }
-      if(posCount >= walkCycle.size())
-        posCount = 0;
-    }
-  }
-}
 
 //-----------------------------------------------
 
@@ -223,6 +129,9 @@ void setup()
 
   init_WalkCycle();
 
+  interpreter.add("wc.flush", [](){walkCycle.clear();});
+  interpreter.add("ws.add", &cmd_add_walk_step);
+  
   sTasks.add([](){server.handleClient();});
   sTasks.add([](){trackCyclesPerSecond(false);});//just count
   sTasks.add([](){trackCyclesPerSecond(true);},1000);//collect
