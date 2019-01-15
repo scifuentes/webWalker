@@ -7,7 +7,7 @@ class WebHandlers
 {
 public:
     WebHandlers(ESP8266WebServer& server_)
-        :server(server_)
+      : server(server_)
     {
         mainWeb = "<h1>WebServos</h1>";
         mainWeb += WebElements::movePad();
@@ -19,6 +19,7 @@ public:
         mainWeb += WebElements::servoSlider(5,"setServo");
         mainWeb += WebElements::servoSlider(6,"setServo");
         mainWeb += WebElements::servoSlider(7,"setServo");
+        mainWeb += WebElements::textArea("commands","Commands");
         mainWeb += WebElements::browserCounter(); 
         mainWeb += WebElements::refreshQuery("serverTime",1000);
         mainWeb += WebElements::refreshQuery("cycles",1000);
@@ -53,6 +54,29 @@ public:
           Serial.println(String("Servo[")+s+"] => "+v);
         }
       } 
+    }
+
+    void parseCommands(void(*commandInterpreter)(const String&))
+    {
+      server.send(204);
+      Serial.println(__func__);
+      printServerRequest();
+
+      //split in lines and send them for execution
+      const String& text = server.arg(0);
+      String line;
+      line.reserve(text.length());
+      for(int i = 0; i<text.length(); i++)
+        if(text[i]=='\n')
+        {
+          commandInterpreter(line);
+          line="";
+        } else 
+        {
+          line+=text[i];
+        }
+
+      commandInterpreter(line);
     }
 
 private:

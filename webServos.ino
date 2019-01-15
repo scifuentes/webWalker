@@ -10,9 +10,10 @@
 #include "WebHandlers.hpp"
 #include "ServoAux.hpp"
 #include <vector>
+#include <regex>
 
-#define ssid      "TP-LINK_90B8E8"
-#define password  "17133531"
+#define ssid      "VFNL-FDD180"
+#define password  "95K9XSZ8CYHL2"
  
 ESP8266WebServer server(83);
 
@@ -25,28 +26,6 @@ QuadMove quad(servos,sTasks);
 unsigned int cycleCounter = 0;
 unsigned int overshootCounter;
 unsigned int localOvershotCounter;
-
-void setup() 
-{
-  setupSerial();
-  setupWebServer();
-  quad.setZero();
-  setupServos();
-  quad.setZero();
-
-  sTasks.add([](){server.handleClient();});
-  sTasks.add([](){trackCyclesPerSecond(false);});//just count
-  sTasks.add([](){trackCyclesPerSecond(true);},1000);//collect
-
-  sTasks.add([](){quad.loop();},100);
-}
-
-void loop() {
-  sTasks.loop();
-}
-
-//-----------------------------------------------
-
 
 void setupSerial()
 {
@@ -107,7 +86,7 @@ void setupWebServer()
   server.on("/one", [](){quad.setBase();});
   server.on("/fwd", [](){quad.stepFwd();});
   server.on("/stop", [](){quad.stop();});
-
+  server.on("/commands", [](){handlers.parseCommands(&commandInterpreter);});
 
   server.begin();
   Serial.println("Server started");
@@ -130,7 +109,67 @@ void trackCyclesPerSecond(bool collect)
   }
 }
 
+struct WalkMove
+{
+  WalkMove()  {}
+  WalkMove(int s0,int s1,int steps)
+    :s0(s0),s1(s1),steps(steps)    {}
 
+  int s0;
+  int s1;
+  int steps;
+};
+std::vector<WalkMove> walkCycle;
+
+void init_WalkCycle()
+{
+  walkCycle.push_back(WalkMove(1000,2000,50));
+  walkCycle.push_back(WalkMove(1100,1900,30));
+  walkCycle.push_back(WalkMove(1200,1800,40));
+  walkCycle.push_back(WalkMove(1300,1700,70));
+  walkCycle.push_back(WalkMove(1400,1600,60));
+  walkCycle.push_back(WalkMove(1500,1500,30));
+  walkCycle.push_back(WalkMove(1400,1600,10));
+  walkCycle.push_back(WalkMove(1300,1700,50));
+  walkCycle.push_back(WalkMove(1200,1800,60));
+  walkCycle.push_back(WalkMove(1100,1900,70));
+}
+
+
+
+void commandInterpreter(const String& command)
+{
+  Serial.println(String(__func__)+": "+command);
+  
+  std::vector<int> spaces;
+  int p=-1;
+  do
+  {
+    p=command.indexOf(" ",p+1);
+    if(p>0)
+      spaces.push_back(p);
+  } while(p>0);
+
+  if(command.startsWith("wc.flush"))
+  {
+    walkCycle.clear();
+  }
+  else if(command.startsWith("ws.add"))
+  {
+    Serial.println("ws.add");
+
+    WalkMove move;
+    move.s0=command.substring(spaces[0],spaces[1]).toInt();
+    move.s1=command.substring(spaces[1],spaces[2]).toInt();
+    move.steps=command.substring(spaces[2]).toInt();
+    walkCycle.push_back(move);
+  }
+  else
+  {
+    Serial.println("Unknown command");
+  }
+
+}
 
 
 
@@ -143,31 +182,17 @@ void moveServos()
     localOvershotCounter += delta - 1000/50;
     zeroTime= millis();
 
-    const int posSize = 10;
     static int posCount = 0, subCount=0;
-    static int pos[posSize][3] =
-    {
-      {50,1000,2000},
-      {30,1100,1900},
-      {40,1200,1800},
-      {70,1300,1700},
-      {60,1400,1600},
-      {30,1500,1500},
-      {10,1400,1600},
-      {50,1300,1700},
-      {60,1200,1800},
-      {70,1100,1900}
-    };
 
     for(int i=0; i<4; i++)
     {
       int nextCount = posCount + 1;
-      if(nextCount>=posSize)
+      if(nextCount>=walkCycle.size())
         nextCount = 0;
 
-      int subs = pos[posCount][0];
-      int p0 = pos[posCount][1] + ((pos[nextCount][1] - pos[posCount][1])*subCount) / subs;
-      int p1 = pos[posCount][2] + ((pos[nextCount][2] - pos[posCount][2])*subCount) / subs;
+      int subs = walkCycle[posCount].steps;
+      int p0 = walkCycle[posCount].s0 + ((walkCycle[nextCount].s0 - walkCycle[posCount].s0)*subCount) / subs;
+      int p1 = walkCycle[posCount].s1 + ((walkCycle[nextCount].s1 - walkCycle[posCount].s1)*subCount) / subs;
       servos[i*2].write(p0);
       servos[i*2+1].write(p1);
   
@@ -179,9 +204,35 @@ void moveServos()
         subCount = 0;
         posCount++;
       }
-      if(posCount>=posSize)
+      if(posCount >= walkCycle.size())
         posCount = 0;
     }
   }
 }
+
+//-----------------------------------------------
+
+
+void setup() 
+{
+  setupSerial();
+  setupWebServer();
+  quad.setZero();
+  setupServos();
+  quad.setZero();
+
+  init_WalkCycle();
+
+  sTasks.add([](){server.handleClient();});
+  sTasks.add([](){trackCyclesPerSecond(false);});//just count
+  sTasks.add([](){trackCyclesPerSecond(true);},1000);//collect
+
+  sTasks.add([](){quad.loop();},100);
+}
+
+void loop() {
+  sTasks.loop();
+}
+
+//-----------------------------------------------
 

@@ -6,17 +6,20 @@
 
 struct WebElements
 {
-    static String servoSlider(int servo_nr,String handler)
+    static 
+    const String servoSlider(int servo_nr,String handler)
     {
         //value show and submitted on change
         return String()+
         "<form action=\""+handler+"\" method=POST oninput=\"x.value=parseInt(servo_"+servo_nr+".value)\" >"
             "Servo "+servo_nr+": 0<input type=\"range\" name=\"servo_"+servo_nr+"\" min=\"0\" max=\"180\" onchange=\"this.form.submit()\">180 : "
             "<output name=\"x\" for=\"servo_"+servo_nr+"\"></output>"
-        "</form>";
+        "</form>"
+        ;
     }
 
-    static String refreshQuery(String data,int interval)
+    static 
+    const String refreshQuery(String data,int interval)
     {
       const String script_showData = String()+
                    "setInterval("
@@ -28,7 +31,8 @@ struct WebElements
       return "<p id=\"showdata_"+data+"\">init</p><script>"+script_showData+"</script>";
     }
 
-    static String browserCounter()
+    static 
+    const String browserCounter()
     {
       const String script_Counter = 
                        "var a = 0;"
@@ -39,12 +43,10 @@ struct WebElements
       return "<p id=\"count\">init</p><script>"+script_Counter+"</script>";
     }
 
-
-
-
-    static String movePad()
+    static 
+    const String movePad()
     {
-        return String()+
+        return String() +
         "<table>"
           "<tr>"
             "<th><button type=\"button\" onmousedown=\"fetch('/right')\" onmouseup=\"fetch('/stop')\" style=\"height:25px;width:40px\" ><</button></th>"
@@ -56,11 +58,24 @@ struct WebElements
             "<th><button type=\"button\" onmousedown=\"fetch('/back')\" onmouseup=\"fetch('\\stop')\" style=\"height:25px;width:40px\" >v</button></th>"
             "<th><button type=\"button\" onclick=\"fetch('/one')\" style=\"height:20px;width:20px\" >1</button></th>"
           "</tr>"
-        "</table>";
+        "</table>"
+        ;
     }
     
+    static 
+    const String textArea(String handler, String title="" )
+    {
+      return String() +
+      "<form action=\"/"+handler+"\" method=\"post\">"
+        + title +
+        "<textarea rows=\"4\" cols=\"50\" name=\"text\">"
+        "</textarea>"
+        "<br>"
+        "<button type=\"submit\">Send</button>"
+      "</form>"
+      ;
+    }
 };
-
 
 
 #endif
