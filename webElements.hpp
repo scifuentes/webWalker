@@ -38,7 +38,7 @@ struct WebElements
                        "var a = 0;"
                        "setInterval("
                          "function()"
-                           "{a= a+.1; document.getElementById(\"count\").innerHTML =\"counter: \"+a}"
+                           "{a= a+.1; document.getElementById(\"count\").innerHTML =\"web counter: \"+a}"
                          ", 100);";
       return "<p id=\"count\">init</p><script>"+script_Counter+"</script>";
     }

@@ -1,11 +1,31 @@
-#ifndef SOFTTaskDataS_HPP
-#define SOFTTaskDataS_HPP
+#ifndef SoftTasks_HPP
+#define SoftTasks_HPP
 
+#include <list>
 #include <vector>
 #include <functional>
+#include <algorithm>
 
-//typedef void(*VoidCall)();
-typedef std::function<void()> VoidCall;
+
+struct TaskData
+{
+    TaskData(std::function<int()> call, int interval, std::string name="")
+    :call(call), interval(interval), last_time(0), name(name)
+    {
+        Serial.println(String("New Task Created with Name ")+name.c_str());
+    }
+    ~TaskData()
+    {
+        Serial.println(String("Task Destroyed with Name ")+name.c_str());
+    }
+
+    std::function<int()> call;
+    int interval;
+    int last_time;
+    int id=-1;
+    std::string name;
+};
+
 
 class SoftTasks
 {
@@ -13,35 +33,87 @@ public:
     void loop()
     {
         int now = millis();
-        for(TaskData& cd : calls)
-        {
-            if(now-cd.last_time >= cd.interval)
+        bool triggerClean = false;
+        for(auto& tsk : tasks)
+            if(now-tsk->last_time >= tsk->interval)
             {
-                cd.last_time = now;
-                (cd.call)();
+                int newInterval;
+                tsk->last_time = now;
+                newInterval = tsk->call();
+                tsk->interval = newInterval;
+                triggerClean |= (newInterval <0);
             }
+
+        if(triggerClean)
+        {
+            Serial.println("Cleaning finished tasks");
+            tasks.erase(std::remove_if(tasks.begin(), tasks.end(),
+                                       [](const std::shared_ptr<TaskData>& t){return t->interval<0;}),
+                        tasks.end());
         }
     }
 
-    int add(VoidCall call, int interval_ms=0)
+    int add(std::function<int()> call, int interval_ms=0, std::string name = "")
     {
-        TaskData t = TaskData(call,interval_ms,idCnt++);
-        calls.push_back(t);
-        return t.id;
+        addInt(call,interval_ms,name);
+    }
+    int addInt(std::function<int()> call, int interval_ms=0, std::string name = "")
+    {
+        Serial.println(String("Adding int task ")+name.c_str());
+        return add(std::make_shared<TaskData>(call, interval_ms, name));
     }
 
-    void remove(int taskId)
+    int add(std::function<bool()> call, int interval_ms=0, std::string name = "")
     {
-        int l0 = calls.size();
+        addBool(call,interval_ms,name);
+    }
+    int addBool(std::function<bool()> call, int interval_ms=0, std::string name = "")
+    {
+        Serial.println(String("Adding boolean task ")+name.c_str());
+        return add(std::make_shared<TaskData>(std::bind(&SoftTasks::wrapBoolTask, call, interval_ms), interval_ms, name));
+    }
+    static int wrapBoolTask(std::function<bool()> call, int interval)
+    {
+        return (call()? interval:-1);
+    }
 
-        std::vector<TaskData>::iterator it;
-        for(it=calls.begin(); it!=calls.end(); it++)
-            if(it->id == taskId)
+    int add(std::function<void()> call, int interval_ms=0, std::string name = "")
+    {
+        addVoid(call,interval_ms,name);
+    }
+    int addVoid(std::function<void()> call, int interval_ms=0, std::string name = "")
+    {
+        Serial.println(String("Adding void task ")+name.c_str());
+        return add(std::make_shared<TaskData>(std::bind(&SoftTasks::wrapVoidTask, call, interval_ms), interval_ms, name));
+    }
+    static int wrapVoidTask(std::function<void()> call, int interval)
+    {
+        call(); return interval;
+    }
+
+    int add(std::shared_ptr<TaskData> t)
+    {
+        t->id=idCnt++;
+        tasks.push_back(t);
+
+        Serial.println(String("Added task ")+t->name.c_str()+ " with Id "+ t->id + " and interval " + t->interval);
+
+        return t->id;
+    }
+
+    void kill(int taskId)
+    {
+        int l0 = tasks.size();
+
+        std::list<std::shared_ptr<TaskData> >::iterator it;
+        for(it=tasks.begin(); it!=tasks.end(); it++)
+            if((*it)->id == taskId)
                 break;
-        if(it!=calls.end())
-            calls.erase(it);
 
-        if(calls.size()>=l0)
+        if(it!=tasks.end())
+            tasks.erase(it);
+
+        if(tasks.size()>=l0)
         {
             Serial.print("Failed to remove task:");
             Serial.println(taskId);
@@ -49,24 +121,60 @@ public:
     }
 
 private:
-    struct TaskData
-    {
-        TaskData(VoidCall call, int interval, int id)
-        :call(call),interval(interval),last_time(0),id(id)
-        {}
 
-        VoidCall call;
-        int interval;   //ms
-        int last_time;
-        int id;
-    };
-
-    std::vector<TaskData> calls;
+    std::list<std::shared_ptr<TaskData> > tasks;
     int idCnt;
 };
 
 
+class TaskQueue
+{
+public:
+    TaskQueue(bool cyclic)
+    :repeat(cyclic), hold(false)
+    {
+    }
 
+    int go()
+    {
+        if(hold)
+            return 100;
+
+        if(!qtasks.empty())
+        {
+            bool keepGoing = qtasks.front().call();
+            if(!keepGoing)
+            {
+                if(repeat)
+                    qtasks.push_back(qtasks.front());
+
+                qtasks.pop_front();
+
+                if(!qtasks.empty())
+                    return qtasks.front().interval;
+                else
+                    return 100;
+            }
+        }
+    }
+
+    void add(std::function<bool()> task, int interval_ms=0)
+    {
+        qtasks.push_back(TaskData(task,interval_ms));
+    }    
+
+    void clear()
+    {
+        qtasks.clear();
+    }
+
+    bool repeat;
+    bool hold;
+private:
+    std::list<TaskData> qtasks;
+
+
+};
 
 
 #endif

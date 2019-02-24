@@ -3,6 +3,18 @@
 
 #include "webElements.hpp"
 
+void printServerRequest(ESP8266WebServer& server)
+{
+  Serial.println(String("-URI: ") + server.uri());
+  Serial.println(String("-Method: ") + (server.method() == HTTP_GET ? "GET" : "POST"));
+  Serial.println(String("-Arguments: ")+ server.args());
+  for (uint8_t i = 0; i < server.args(); i++) 
+  {
+    Serial.println(String("-- ") + server.argName(i) + ": " + server.arg(i));
+  }
+}
+
+
 class WebHandlers
 {
 public:
@@ -29,7 +41,7 @@ public:
     {
         server.send(404);
         Serial.println("Unknown request");
-        printServerRequest();
+        printServerRequest(server);
     }
 
     void root()
@@ -42,7 +54,7 @@ public:
     {
       server.send(204);
       Serial.println(__func__);
-      //printServerRequest();
+      //printServerRequest(server);
 
       for (uint8_t i = 0; i < server.args(); i++) 
       {
@@ -56,43 +68,10 @@ public:
       } 
     }
 
-    void parseCommands(std::function<void(const String&)> commandInterpreter)
-    {
-      server.send(204);
-      Serial.println(__func__);
-      printServerRequest();
-
-      //split in lines and send them for execution
-      const String& text = server.arg(0);
-      String line;
-      line.reserve(text.length());
-      for(int i = 0; i<text.length(); i++)
-        if(text[i]=='\n')
-        {
-          commandInterpreter(line);
-          line="";
-        } else 
-        {
-          line+=text[i];
-        }
-
-      commandInterpreter(line);
-    }
-
 private:
     ESP8266WebServer& server;
     String mainWeb;
 
-    void printServerRequest()
-    {
-      Serial.println(String("-URI: ")+ server.uri());
-      Serial.println(String("-Method: ") + (server.method() == HTTP_GET ? "GET" : "POST"));
-      Serial.println(String("-Arguments: ")+ server.args());
-      for (uint8_t i = 0; i < server.args(); i++) 
-      {
-        Serial.println(String("-- ") + server.argName(i) + ": " + server.arg(i));
-      }
-    }
 
 };
 
