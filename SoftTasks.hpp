@@ -9,8 +9,8 @@
 
 struct TaskData
 {
-    TaskData(std::function<int()> call, int interval, std::string name="")
-    :call(call), interval(interval), last_time(0), name(name)
+    TaskData(std::function<int()>&& call, int interval, const std::string& name="")
+    :call(std::forward<std::function<int()>>(call)), interval(interval), last_time(0), name(name)
     {
         Serial.println(String("New Task Created with Name ")+name.c_str());
     }
@@ -23,7 +23,7 @@ struct TaskData
     int interval;
     int last_time;
     int id=-1;
-    std::string name;
+    const std::string name;
 };
 
 
@@ -53,40 +53,43 @@ public:
         }
     }
 
-    int add(std::function<int()> call, int interval_ms=0, std::string name = "")
+    int add(std::function<int()> &&call, int interval_ms=0, const std::string& name="")
     {
-        addInt(call,interval_ms,name);
+         addInt(std::forward<std::function<int()>>(call),interval_ms,name);
     }
-    int addInt(std::function<int()> call, int interval_ms=0, std::string name = "")
+    int add(std::function<bool()> &&call, int interval_ms=0, const std::string& name="")
     {
-        Serial.println(String("Adding int task ")+name.c_str());
-        return add(std::make_shared<TaskData>(call, interval_ms, name));
+         addBool(std::forward<std::function<bool()>>(call),interval_ms,name);
+    }
+    int add(std::function<void()> &&call, int interval_ms=0, const std::string& name="")
+    {
+         addVoid(std::forward<std::function<void()>>(call),interval_ms,name);
     }
 
-    int add(std::function<bool()> call, int interval_ms=0, std::string name = "")
+    int addInt(std::function<int()> &&call, int interval_ms=0, const std::string& name="")
     {
-        addBool(call,interval_ms,name);
+        Serial.println(String("Adding int task ")+name.c_str());
+        return add(std::make_shared<TaskData>(std::forward<std::function<int()>>(call), interval_ms, name));
     }
-    int addBool(std::function<bool()> call, int interval_ms=0, std::string name = "")
+
+    int addBool(std::function<bool()> &&call, int interval_ms=0, const std::string& name="")
     {
         Serial.println(String("Adding boolean task ")+name.c_str());
-        return add(std::make_shared<TaskData>(std::bind(&SoftTasks::wrapBoolTask, call, interval_ms), interval_ms, name));
+        //return add(std::make_shared<TaskData>([call,interval_ms](){return call()?interval_ms:-1;}, interval_ms, name));
+
+        return add(std::make_shared<TaskData>(std::bind(&SoftTasks::wrapBoolTask, std::forward<std::function<bool()>>(call), interval_ms), interval_ms, name));
     }
-    static int wrapBoolTask(std::function<bool()> call, int interval)
+    static int wrapBoolTask(std::function<bool()> &call, int &interval)
     {
         return (call()? interval:-1);
     }
 
-    int add(std::function<void()> call, int interval_ms=0, std::string name = "")
-    {
-        addVoid(call,interval_ms,name);
-    }
-    int addVoid(std::function<void()> call, int interval_ms=0, std::string name = "")
+    int addVoid(std::function<void()>&& call, int interval_ms=0, const std::string& name="")
     {
         Serial.println(String("Adding void task ")+name.c_str());
         return add(std::make_shared<TaskData>(std::bind(&SoftTasks::wrapVoidTask, call, interval_ms), interval_ms, name));
     }
-    static int wrapVoidTask(std::function<void()> call, int interval)
+    static int wrapVoidTask(std::function<void()> &call, int &interval)
     {
         call(); return interval;
     }
@@ -158,9 +161,9 @@ public:
         }
     }
 
-    void add(std::function<bool()> task, int interval_ms=0)
+    void add(std::function<int()> task, int interval_ms=0)
     {
-        qtasks.push_back(TaskData(task,interval_ms));
+        //qtasks.push_back(TaskData(task,interval_ms));
     }    
 
     void clear()

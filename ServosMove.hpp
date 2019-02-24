@@ -26,7 +26,15 @@ public:
     , fpos(other.fpos)
     , delta(other.delta)
     {
-        Serial.println(String("ServoMove Copy"));
+        Serial.println(String("ServoMove const Copy"));
+    }
+
+    ServoMove(ServoMove& other)
+    : servo(other.servo)
+    , fpos(other.fpos)
+    , delta(other.delta)
+    {
+        Serial.println(String("ServoMove mutable Copy"));
     }
 
     ~ServoMove()
@@ -182,10 +190,20 @@ void cmd_moveServo(const String& command, const std::vector<int>& spaces, SoftTa
     std::function<int()> m = std::bind(&ServoMove::move, instance);
     sTasks.add(m,20,"MoveServo");
     */
-    sTasks.addBool(std::bind(&ServoMove::move, 
-                             ServoMove(servos[index], pos, speed))
-               ,20,"MoveServo");
-
+    /*
+    ServoMove servoMove(servos[index], pos, speed);
+    sTasks.addBool([servoMove]()mutable{return servoMove.move();}
+                   ,20,"MoveServo");
+    */
+    /*
+    std::function<bool()> f = std::bind(&ServoMove::move, ServoMove(servos[index], pos, speed));
+    Serial.println("..Adding");
+    sTasks.addBool(std::move(f),20,"MoveServo");
+    */
+    
+    sTasks.addBool(std::bind(&ServoMove::move, ServoMove(servos[index], pos, speed))
+                   ,20,"MoveServo");
+    
     Serial.println(String(__func__)+" Done");
 
 }
