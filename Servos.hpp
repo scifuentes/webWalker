@@ -48,8 +48,8 @@ std::vector<Servo>& setupServos(
   servos[6].attach(D7);
   servos[7].attach(D8);
 
-  cmdHandlers.add("s.one", &cmd_setServo);
-  cmdHandlers.add("s.all", &cmd_setServos);
+  cmdHandlers.add("servo.set", &cmd_setServo);
+  cmdHandlers.add("servos.set", &cmd_setServos);
 
   return servos;
 

@@ -6,28 +6,90 @@
 #include <functional>
 #include <algorithm>
 
+#define TraceTasks
+#ifdef TraceTasks
+#define TRACE(foo) Serial.println(foo)
+#else
+#define TRACE(foo) ;
+#endif
 
 struct TaskData
 {
     TaskData(std::function<int()>&& call, int interval, const std::string& name="")
     :call(std::move(call)), interval(interval), last_time(0), name(name)
     {
-        Serial.println(String("New&& Task Created with Name ")+name.c_str());
+        TRACE(String("New&& Task Created with Name ")+name.c_str());
     }
+    
+    #ifdef TraceTasks
     ~TaskData()
     {
-        Serial.println(String("Task Destroyed with Name ")+name.c_str());
+        TRACE(String("Task Destroyed with Name ")+name.c_str());
     }
+    #endif
 
     std::function<int()> call;
-    int interval;
+    int interval;   //in ms
     int last_time;
     int id=-1;
     const std::string name;
 };
 
+class TasksContainer
+{
+public:
+    int add(std::function<int()> &&call, int interval_ms=0, const std::string& name="")
+    {
+         addInt(std::move(call),interval_ms,name);
+    }
+    int add(std::function<bool()> &&call, int interval_ms=0, const std::string& name="")
+    {
+         addBool(std::move(call),interval_ms,name);
+    }
+    int add(std::function<void()> &&call, int interval_ms=0, const std::string& name="")
+    {
+         addVoid(std::move(call),interval_ms,name);
+    }
 
-class SoftTasks
+    int addInt(std::function<int()> &&call, int interval_ms=0, const std::string& name="")
+    {
+        TRACE(String("Adding int task ")+name.c_str());
+
+        return add(std::make_shared<TaskData>(std::move(call), interval_ms, name));
+    }
+
+    int addBool(std::function<bool()> &&call, int interval_ms=0, const std::string& name="")
+    {
+        TRACE(String("Adding boolean task ")+name.c_str());
+
+        return add(std::make_shared<TaskData>([call=std::move(call),interval_ms](){return call()?interval_ms:-1;}, interval_ms, name));
+    }
+
+    int addVoid(std::function<void()>&& call, int interval_ms=0, const std::string& name="")
+    {
+        TRACE(String("Adding void task ")+name.c_str());
+
+        return add(std::make_shared<TaskData>([call=std::move(call),interval_ms](){call(); return interval_ms;}, interval_ms, name));
+    }
+
+    int add(std::shared_ptr<TaskData> t)
+    {
+        t->id=idCnt++;
+        tasks.push_back(t);
+
+        TRACE(String("Added task ")+t->name.c_str()+ " with Id "+ t->id + " and interval " + t->interval);
+
+        return t->id;
+    }
+
+protected:
+
+    std::list<std::shared_ptr<TaskData> > tasks;
+    int idCnt;
+
+};
+
+class SoftTasks : public TasksContainer
 {
 public:
     void loop()
@@ -46,53 +108,14 @@ public:
 
         if(triggerClean)
         {
-            Serial.println("Cleaning finished tasks");
+            TRACE("Cleaning finished tasks");
+
             tasks.erase(std::remove_if(tasks.begin(), tasks.end(),
                                        [](const std::shared_ptr<TaskData>& t){return t->interval<0;}),
                         tasks.end());
         }
     }
 
-    int add(std::function<int()> &&call, int interval_ms=0, const std::string& name="")
-    {
-         addInt(std::move(call),interval_ms,name);
-    }
-    int add(std::function<bool()> &&call, int interval_ms=0, const std::string& name="")
-    {
-         addBool(std::move(call),interval_ms,name);
-    }
-    int add(std::function<void()> &&call, int interval_ms=0, const std::string& name="")
-    {
-         addVoid(std::move(call),interval_ms,name);
-    }
-
-    int addInt(std::function<int()> &&call, int interval_ms=0, const std::string& name="")
-    {
-        Serial.println(String("Adding int task ")+name.c_str());
-        return add(std::make_shared<TaskData>(std::move(call), interval_ms, name));
-    }
-
-    int addBool(std::function<bool()> &&call, int interval_ms=0, const std::string& name="")
-    {
-        Serial.println(String("Adding boolean task ")+name.c_str());
-        return add(std::make_shared<TaskData>([call=std::move(call),interval_ms](){return call()?interval_ms:-1;}, interval_ms, name));
-    }
-
-    int addVoid(std::function<void()>&& call, int interval_ms=0, const std::string& name="")
-    {
-        Serial.println(String("Adding void task ")+name.c_str());
-        return add(std::make_shared<TaskData>([call=std::move(call),interval_ms](){call(); return interval_ms;}, interval_ms, name));
-    }
-
-    int add(std::shared_ptr<TaskData> t)
-    {
-        t->id=idCnt++;
-        tasks.push_back(t);
-
-        Serial.println(String("Added task ")+t->name.c_str()+ " with Id "+ t->id + " and interval " + t->interval);
-
-        return t->id;
-    }
 
     void kill(int taskId)
     {
@@ -113,60 +136,55 @@ public:
         }
     }
 
-private:
-
-    std::list<std::shared_ptr<TaskData> > tasks;
-    int idCnt;
 };
 
 
-class TaskQueue
+class TaskQueue : public TasksContainer
 {
 public:
-    TaskQueue(bool cyclic)
-    :repeat(cyclic), hold(false)
+    TaskQueue(bool loop)
+    :loop(loop), hold(false)
     {
     }
 
-    int go()
+    int run()
     {
         if(hold)
             return 100;
 
-        if(!qtasks.empty())
+        if(!tasks.empty())
         {
-            bool keepGoing = qtasks.front().call();
-            if(!keepGoing)
+
+            int currentInterval = tasks.front()->call();
+            bool keepCurrent = (currentInterval >= 0);
+
+            TRACE(String("QTask ")+tasks.front()->id+":"+currentInterval);
+
+            if(keepCurrent)
+                return currentInterval;
+            else
             {
-                if(repeat)
-                    qtasks.push_back(qtasks.front());
+                if(loop)
+                    tasks.push_back(tasks.front());
 
-                qtasks.pop_front();
+                tasks.pop_front();
 
-                if(!qtasks.empty())
-                    return qtasks.front().interval;
-                else
-                    return 100;
+                if(!tasks.empty())
+                    return tasks.front()->interval;
             }
         }
+        
+        return 100;
     }
-
-    void add(std::function<int()> task, int interval_ms=0)
-    {
-        //qtasks.push_back(TaskData(task,interval_ms));
-    }    
 
     void clear()
     {
-        qtasks.clear();
+        tasks.clear();
+        hold=true;
     }
 
-    bool repeat;
+    bool loop;
     bool hold;
-private:
-    std::list<TaskData> qtasks;
-
-
 };
 
 

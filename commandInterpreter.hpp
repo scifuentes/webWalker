@@ -43,17 +43,16 @@ void commandForwarder(const String& command,
   } while(p>0);
   spaces.push_back(command.length());
   
+  String command0 = command.substring(0, spaces[0]);
+  Serial.println("command0: "+command0);
   for(const CommandHandler& handler: cmdHandlers.handlers)
-  {
-    String command0 = command.substring(0, spaces[0]);
     if(command0 == handler.command)
     {
         handler.method(command,spaces);
         return;
     }
-  }
 
-  Serial.println("Unknown command");
+  Serial.println("...Unknown command: '"+command+"'");
 }
 
 void commandsSplitter(const String& commands, 
@@ -86,7 +85,13 @@ void handleCommandsRequest(ESP8266WebServer& server,
   commandsSplitter(server.arg(0), cmdHandlers);
 }
 
-
+String listCommands(const CommandHandlers& cmdHandlers, const String spacer="\n")
+{
+  String commands = "";
+  for(const CommandHandler& handler: cmdHandlers.handlers)
+    commands += handler.command + spacer;
+  return commands;
+}
 
 
 

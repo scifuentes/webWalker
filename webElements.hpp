@@ -21,14 +21,14 @@ struct WebElements
     static 
     const String refreshQuery(String data,int interval)
     {
-      const String script_showData = String()+
+      const String script_refreshData = String()+
                    "setInterval("
                       "function(){fetch(\"/"+data+"\").then("
                             "function(response){ response.text().then("
                                   "function(text){ document.getElementById(\"showdata_"+data+"\").innerHTML = text; }"
                          ")})}"
                       ","+interval+");";
-      return "<p id=\"showdata_"+data+"\">init</p><script>"+script_showData+"</script>";
+      return "<p id=\"showdata_"+data+"\">init</p><script>"+script_refreshData+"</script>";
     }
 
     static 
@@ -40,7 +40,8 @@ struct WebElements
                          "function()"
                            "{a= a+.1; document.getElementById(\"count\").innerHTML =\"web counter: \"+a}"
                          ", 100);";
-      return "<p id=\"count\">init</p><script>"+script_Counter+"</script>";
+      return "<p id=\"count\">init</p>"
+             "<script>"+script_Counter+"</script>";
     }
 
     static 
@@ -75,6 +76,23 @@ struct WebElements
       "</form>"
       ;
     }
+
+    static 
+    const String manualQuery(String data, String bttCaption)
+    {
+      const String script_getData = String()+
+                      "function get_"+data+"(){"
+                         "fetch(\"/"+data+"\").then("
+                            "function(response){ response.text().then("
+                                  "function(text){ document.getElementById(\"manualquery_"+data+"\").innerHTML = text; }"
+                      ")})}";
+      return "<div>"
+               "<button onclick = get_"+data+"()>"+bttCaption+"</button>"
+               "<span id=\"manualquery_"+data+"\">init</span>"
+             "</div>"
+             "<script>"+script_getData+"</script>";
+    }
+
 };
 
 

@@ -10,7 +10,7 @@
 #include "WebHandlers.hpp"
 #include "Servos.hpp"
 #include "ServosMove.hpp"
-#include "walk.hpp"
+//#include "walk.hpp"
 #include "commandInterpreter.hpp"
 #include <vector>
 #include <regex>
@@ -63,17 +63,22 @@ void setupWebServer(
   static WebHandlers handlers(server);
 
   server.on("/", [](){handlers.root();});
-  server.on("/setServo", [&](){handlers.setServo(servos);});
-  server.on("/serverTime", [&](){server.send(200, "text/html", String("Server Time: ")+(millis()/1000.));});
-  server.on("/cycles", [&](){server.send(200, "text/html", String("Cycles per seccond= ")+ cycleCounter +"; overshoot= "+ overshootCounter);});
   server.onNotFound([](){handlers.notFound();});
+
+  server.on("/serverTime", [&](){server.send(200, "text/html", String("Server Time: ")+(millis()/1000.));});
+  server.on("/cycles", [&](){server.send(200, "text/html", String("Cycles per seccond= ")+ globals.cycleCounter +"; overshoot= "+ globals.overshootCounter);});
+
+  server.on("/setServo", [&](){handlers.setServo(servos);});
+
 /*
   server.on("/zero", [&](){quad.setZero();});
   server.on("/one", [&](){quad.setBase();});
   server.on("/fwd", [&](){quad.stepFwd();});
   server.on("/stop", [&](){quad.stop();});
-  */
+*/
+
   server.on("/commands", [&](){handleCommandsRequest(server, cmdHandlers);});
+  server.on("/listCommands", [&](){server.send(200, "text/html", listCommands(cmdHandlers, ", "));});
 
   server.begin();
   Serial.println("Server started");
@@ -85,10 +90,10 @@ void trackCycles(bool collect)
   static unsigned int localCycleCounter;
   if(collect)
   {
-    overshootCounter = localOvershotCounter;
-    cycleCounter = localCycleCounter;
+    globals.overshootCounter = globals.localOvershotCounter;
+    globals.cycleCounter = localCycleCounter;
     localCycleCounter = 0;
-    localOvershotCounter = 0;
+    globals.localOvershotCounter = 0;
   }
   else
   {
@@ -118,9 +123,9 @@ void setup()
   //init_Walk(cmdHandlers);
   //quad.setZero();
 
-  sTasks.add([](){server.handleClient();},5, "webHandle");
-  //sTasks.add([](){trackCycles(false);}, 0, "cycleCounter");//just count, every loop
-  //sTasks.add([](){trackCycles(true);}, 1000, "cycleStorer");//collect, once a second
+  sTasks.add([](){server.handleClient();},10, "webHandle");
+  sTasks.add([](){trackCycles(false);}, 0, "cycleCounter");//just count, every loop
+  sTasks.add([](){trackCycles(true);}, 1000, "cycleStorer");//collect, once a second
 
   //sTasks.add([](){quad.loop();},100);
 }

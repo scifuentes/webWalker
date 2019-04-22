@@ -32,6 +32,7 @@ public:
         mainWeb += WebElements::servoSlider(6,"setServo");
         mainWeb += WebElements::servoSlider(7,"setServo");
         mainWeb += WebElements::textArea("commands","Commands");
+        mainWeb += WebElements::manualQuery("listCommands","List Commands");
         mainWeb += WebElements::browserCounter(); 
         mainWeb += WebElements::refreshQuery("serverTime",1000);
         mainWeb += WebElements::refreshQuery("cycles",1000);

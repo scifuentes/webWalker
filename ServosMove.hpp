@@ -6,7 +6,12 @@
 #include "SoftTasks.hpp"
 #include "commandInterpreter.hpp"
 
-#define TrackServo    // this enables printing servo positions
+#define TraceServo
+#ifdef TraceServo
+#define TRACE(foo) Serial.println(foo)
+#else
+#define TRACE(foo) ;
+#endif
 
 TaskQueue moveQueue(true);
 
@@ -18,30 +23,25 @@ public:
     ,fpos(finalPosition)
     ,delta(abs(speed))
     {
-        Serial.println(String("New ServoMove"));
+        TRACE(String("New ServoMove"));
     }
 
+    #ifdef TarceServo
     ServoMove(const ServoMove& other)
     : servo(other.servo)
     , fpos(other.fpos)
     , delta(other.delta)
     {
-        Serial.println(String("ServoMove const Copy"));
+        TRACE(String("ServoMove const Copy"));
     }
+    #endif
 
-    ServoMove(ServoMove& other)
-    : servo(other.servo)
-    , fpos(other.fpos)
-    , delta(other.delta)
-    {
-        Serial.println(String("ServoMove mutable Copy"));
-    }
-
+    #ifdef TarceServo
     ~ServoMove()
     {
-        Serial.println(String("ServoMove Destroyed"));
+        TRACE(String("ServoMove Destroyed"));
     }
-
+    #endif
 
     bool move()
     {
@@ -50,9 +50,7 @@ public:
         {
             servo.write(fpos);
             
-            #ifdef TrackServo
-            Serial.println(String("Servo=")+fpos+"*");
-            #endif
+            TRACE(String("Servo=")+fpos+"*");
             
             //done
             return false;
@@ -65,9 +63,7 @@ public:
                 pos-=delta;
             servo.write(pos);
 
-            #ifdef TrackServo
-            Serial.println(String("Servo=")+pos);
-            #endif
+            TRACE(String("Servo=")+pos);
             
             //keep going
             return true;
@@ -84,26 +80,24 @@ private:
 class ServosMove
 {
 public:
-    bool idle;
+    bool done;
 
-    ServosMove(std::vector<Servo>& servos, SoftTasks& st)
+    ServosMove(std::vector<Servo>& servos)
     :servos(servos)
-    //,st(st)
-    ,idle(true)
+    ,done(true)
     {}
 
 
-    ServosMove(std::vector<Servo>& servos, SoftTasks& st, std::vector<int> finalPositions, int maxSpeed)
+    ServosMove(std::vector<Servo>& servos, std::vector<int> finalPositions, int maxSpeed)
     :servos(servos)
+    ,fpos(finalPositions)
+    ,maxDelta(abs(maxSpeed))
+    ,done(true)
     {
-        set(finalPositions,maxSpeed);
     }
 
-    void set(std::vector<int> finalPositions, int maxSpeed)
+    void set()
     {
-        fpos = finalPositions;
-        maxDelta = abs(maxSpeed);
-
         int maxTravel = -1;
         maxTravelIndex = -1;
         for(int i=0; i<servos.size(); i++)
@@ -115,50 +109,49 @@ public:
                 maxTravelIndex = i;
             }
         }
-        //Serial.println(String("MaxTravel: ")+maxTravel);
-        //Serial.println(String("MaxTravelindex: ")+maxTravelIndex);
-        idle=false;
-        //taskId = st.add([this](){move();},20);   
+        TRACE(String("MaxTravel: ")+maxTravel);
+        TRACE(String("MaxTravelindex: ")+maxTravelIndex);
+        done=false;
     }
 
     bool move()
     {
-        int maxTravel = remTravel(maxTravelIndex);
-        if(maxTravel<=maxDelta)
+        if(done)
+            set();
+
+        if(!done)
         {
-            for(int i=0;i<servos.size();i++)
+            int maxTravel = remTravel(maxTravelIndex);
+            if(maxTravel<=maxDelta)
             {
-                servos[i].write(fpos[i]);
-                Serial.println(String("Servo[")+i+"]="+fpos[i]+"*");
+                for(int i=0;i<servos.size();i++)
+                {
+                    servos[i].write(fpos[i]);
+                    TRACE(String("Servo[")+i+"]="+fpos[i]+"!");
+                }
+                done = true;
             }
-            
-            //done
-            idle = true;
-            return false;
-        }
-        else
-        {
-            for(int i=0; i<servos.size(); i++)
+            else
             {
-                int delta = (maxDelta*remTravel(i))/maxTravel;
-                int pos = servos[i].read();
-                if(fpos[i]>pos)
-                    pos+=delta;
-                else
-                    pos-=delta;
-                servos[i].write(pos);
-                Serial.println(String("Servo[")+i+"]="+pos);
+                for(int i=0; i<servos.size(); i++)
+                {
+                    int delta = (maxDelta*remTravel(i))/maxTravel;
+                    int pos = servos[i].read();
+                    if(fpos[i]>pos)
+                        pos+=delta;
+                    else
+                        pos-=delta;
+                    servos[i].write(pos);
+                    TRACE(String("Servo[")+i+"]="+pos);
+                }
             }
-        
-            //keep going
-            return true;
         }
 
+        return !done;
     }
 
 private:
     std::vector<Servo>& servos;
-    //SoftTasks& st;
     std::vector<int> fpos;
     int maxDelta;
     int maxTravelIndex;
@@ -173,16 +166,16 @@ private:
 
 //================
 
-std::shared_ptr<ServoMove> instance;
+//std::shared_ptr<ServoMove> instance;
 void cmd_moveServo(const String& command, const std::vector<int>& spaces, SoftTasks& sTasks)
 {
-    Serial.println(String(__func__)+": "+command);
+   TRACE(String(__func__)+": "+command);
 
     int index = command.substring(spaces[0],spaces[1]).toInt();
     int pos = command.substring(spaces[1],spaces[2]).toInt();
     int speed = command.substring(spaces[2],spaces[3]).toInt();
 
-    Serial.println(String(__func__)+": "+index+", "+pos+", "+speed);
+    TRACE(String(__func__)+": "+index+", "+pos+", "+speed);
 
     /*
     std::shared_ptr<ServoMove> instance;
@@ -197,20 +190,20 @@ void cmd_moveServo(const String& command, const std::vector<int>& spaces, SoftTa
     */
     /*
     std::function<bool()> f = std::bind(&ServoMove::move, ServoMove(servos[index], pos, speed));
-    Serial.println("..Adding");
+    TRACE("..Adding");
     sTasks.addBool(std::move(f),20,"MoveServo");
     */
     
     sTasks.addBool(std::bind(&ServoMove::move, ServoMove(servos[index], pos, speed))
                    ,20,"MoveServo");
     
-    Serial.println(String(__func__)+" Done");
+    TRACE(String(__func__)+" Done");
 
 }
 
 void cmd_moveServos(const String& command, const std::vector<int>& spaces, SoftTasks& sTasks)
 {
-    Serial.println(String(__func__)+": "+command);
+    TRACE(String(__func__)+": "+command);
     String sValues;
 
     int maxSpeed = command.substring(spaces[0],spaces[1]).toInt();
@@ -222,10 +215,31 @@ void cmd_moveServos(const String& command, const std::vector<int>& spaces, SoftT
         finalPos[i]=sv.toInt();
         sValues+=" "+sv;
     }
-    Serial.println(String(__func__)+" speed: "+maxSpeed+" values: "+sValues);    
+    TRACE(String(__func__)+" speed: "+maxSpeed+" values: "+sValues);    
 
-    moveQueue.add(std::bind(&ServosMove::move, 
-                            ServosMove(servos,sTasks,finalPos,maxSpeed)));
+    sTasks.addBool(std::bind(&ServosMove::move, 
+                            ServosMove(servos,finalPos,maxSpeed)),50);
+
+}
+
+void cmd_moveAdd(const String& command, const std::vector<int>& spaces)
+{
+    TRACE(String(__func__)+": "+command);
+    String sValues;
+
+    int maxSpeed = command.substring(spaces[0],spaces[1]).toInt();
+
+    std::vector<int> finalPos(spaces.size()-1);
+    for(int i=0; i<finalPos.size(); i++)
+    {
+        String sv = command.substring(spaces[i+1],spaces[i+2]);
+        finalPos[i]=sv.toInt();
+        sValues+=" "+sv;
+    }
+    TRACE(String(__func__)+" speed: "+maxSpeed+" values: "+sValues);    
+
+    moveQueue.addBool(std::bind(&ServosMove::move, 
+                                ServosMove(servos,finalPos,maxSpeed)),50);
 
 }
 
@@ -233,13 +247,14 @@ std::vector<Servo>& setupServosMove(
     CommandHandlers& cmdHandlers,
     SoftTasks& sTasks)
 {
-  Serial.println("add moveQueue");
-  sTasks.add([](){moveQueue.go();},100, "Move Queue");
+  TRACE("add moveQueue");
+  sTasks.addInt([](){return moveQueue.run();},100, "Move Queue");
 
   using namespace std::placeholders;
 
-  cmdHandlers.add("mv.one", std::bind(&cmd_moveServo,_1,_2, std::ref(sTasks)));
-  cmdHandlers.add("mv.all", std::bind(&cmd_moveServos,_1,_2, std::ref(sTasks)));
+  cmdHandlers.add("servo.move", std::bind(&cmd_moveServo, _1, _2, std::ref(sTasks)));
+  cmdHandlers.add("servos.move", std::bind(&cmd_moveServos, _1, _2, std::ref(sTasks)));
+  cmdHandlers.add("mv.add", std::bind(&cmd_moveAdd, _1, _2));
   cmdHandlers.add("mv.clear", [](){moveQueue.clear();});
   cmdHandlers.add("mv.pause", [](){moveQueue.hold=true;});
   cmdHandlers.add("mv.go", [](){moveQueue.hold=false;});
