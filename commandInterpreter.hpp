@@ -5,6 +5,13 @@
 #include <functional>
 #include "webHandlers.hpp"
 
+//#define TraceCommands
+#ifdef TraceCommands
+#define TRACE(foo) Serial.println(foo)
+#else
+#define TRACE(foo) ;
+#endif
+
 typedef std::function<void(const String&, const std::vector<int>&)> HandlerSignature;
 struct CommandHandler
 {
@@ -28,7 +35,7 @@ struct CommandHandlers
 void commandForwarder(const String& command, 
                       const CommandHandlers& cmdHandlers)
 {
-  Serial.println(String(__func__)+": "+command);
+  TRACE(String(__func__)+": "+command);
  
   if(command.length()==0)
     return;
@@ -44,7 +51,8 @@ void commandForwarder(const String& command,
   spaces.push_back(command.length());
   
   String command0 = command.substring(0, spaces[0]);
-  Serial.println("command0: "+command0);
+  TRACE("command0: "+command0);
+
   for(const CommandHandler& handler: cmdHandlers.handlers)
     if(command0 == handler.command)
     {
@@ -52,7 +60,7 @@ void commandForwarder(const String& command,
         return;
     }
 
-  Serial.println("...Unknown command: '"+command+"'");
+  TRACE("...Unknown command: '"+command+"'");
 }
 
 void commandsSplitter(const String& commands, 
@@ -79,7 +87,7 @@ void handleCommandsRequest(ESP8266WebServer& server,
                            const CommandHandlers& cmdHandlers)
 {
   server.send(204);
-  Serial.println(__func__);
+  TRACE(__func__);
   printServerRequest(server);
 
   commandsSplitter(server.arg(0), cmdHandlers);

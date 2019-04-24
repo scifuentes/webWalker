@@ -6,7 +6,7 @@
 #include <functional>
 #include <algorithm>
 
-#define TraceTasks
+//#define TraceTasks
 #ifdef TraceTasks
 #define TRACE(foo) Serial.println(foo)
 #else
@@ -84,7 +84,7 @@ public:
 
 protected:
 
-    std::list<std::shared_ptr<TaskData> > tasks;
+    std::vector<std::shared_ptr<TaskData> > tasks;
     int idCnt;
 
 };
@@ -121,7 +121,7 @@ public:
     {
         int l0 = tasks.size();
 
-        std::list<std::shared_ptr<TaskData> >::iterator it;
+        std::vector<std::shared_ptr<TaskData> >::iterator it;
         for(it=tasks.begin(); it!=tasks.end(); it++)
             if((*it)->id == taskId)
                 break;
@@ -131,8 +131,8 @@ public:
 
         if(tasks.size()>=l0)
         {
-            Serial.print("Failed to remove task:");
-            Serial.println(taskId);
+            TRACE("Failed to remove task:");
+            TRACE(taskId);
         }
     }
 
@@ -143,34 +143,39 @@ class TaskQueue : public TasksContainer
 {
 public:
     TaskQueue(bool loop)
-    :loop(loop), hold(false)
+    :loop(loop), hold(false), current(0)
     {
     }
 
     int run()
     {
+
         if(hold)
             return 100;
 
         if(!tasks.empty())
         {
 
-            int currentInterval = tasks.front()->call();
+            int currentInterval = tasks[current]->call();
             bool keepCurrent = (currentInterval >= 0);
 
-            TRACE(String("QTask ")+tasks.front()->id+":"+currentInterval);
+            TRACE(String("QTask ")+tasks[current]->id+":"+currentInterval);
 
             if(keepCurrent)
                 return currentInterval;
             else
             {
-                if(loop)
-                    tasks.push_back(tasks.front());
+                current++;
 
-                tasks.pop_front();
+                if(current >= tasks.size())
+                {
+                    current = 0;
+                    if(!loop)
+                        hold = true;
+                }
 
                 if(!tasks.empty())
-                    return tasks.front()->interval;
+                    return tasks[current]->interval;
             }
         }
         
@@ -181,10 +186,14 @@ public:
     {
         tasks.clear();
         hold=true;
+        current = 0;
     }
 
     bool loop;
     bool hold;
+
+private:
+    int current;
 };
 
 class SleepTask

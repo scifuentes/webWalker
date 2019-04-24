@@ -1,20 +1,32 @@
 # walkSchemas generation for webServos
-
+import urllib, urllib2
 
 def title(name):
     print
     print name,':'
+
 def clear():
-    print 'mv.clear '
+    return 'mv.clear '
 def go():
-    print 'mv.go '
+    return 'mv.go '
+def once():
+    return 'mv.once '
+def loop():
+    return 'mv.loop '
 def mv(pos,spd=5):
-    print 'mv.add',spd,' '.join(str(p) for p in pos)
+    return 'mv.add '+str(spd)+' '+' '.join(str(p) for p in pos)
 def set(pos):
-    print 'servos.set',' '.join(str(p) for p in pos)
+    return 'servos.set '+' '.join(str(p) for p in pos)
+
+def send(cmd):
+    data = urllib.urlencode({"Commands_text":cmd})
+    req = urllib2.Request('http://192.168.1.83:83/commands', data)
+    response = urllib2.urlopen(req)
+
 def add(l0,l1):
     return [v0+v1 for v0,v1 in zip(l0,l1)]
-
+def scale(vector,factor):
+    return [v*factor for v in vector]
 #[front_left front_right back_left back_right]
 #[z x]
 zero = [90]*8
@@ -28,11 +40,15 @@ fwd1 = [ 0,1,0,-1,0,1, 0,-1]
 rot1 = [ 0,1,0, 1,0,1, 0, 1]
 
 
-def bodyMove(x=0,z=0,r=0,ref=base):
-    mv_rel = add(add([z*v for v in up1],[x*v for v in fwd1]),[r*v for v in rot1])
-    return add(mv_rel,ref)
+def bodyPos(pos=None,x=0,z=0,r=0,ref=base):
+    if pos:
+        pos_rel = [p*-(h+v) for p,h,v in zip(pos,fwd1,up1)]
+    else:
+        pos_rel = add(add([z*v for v in up1],[x*v for v in fwd1]),[r*v for v in rot1])
+    return add(pos_rel,ref)
 
-def legMove(ileg,x=0,z=0,ref=base):
+
+def legPos(ileg,x=0,z=0,ref=base):
     ileg_z=2*ileg
     ileg_x=2*ileg+1
     mv_rel = [0]*8
@@ -44,10 +60,10 @@ class Robot:
     def __init__(self,ref=base):
         self.pos=ref
     def bodyMove(self,x=0,z=0,r=0):
-        self.pos = bodyMove(x,z,r,self.pos)
+        self.pos = bodyPos(x=x,z=z,r=r,ref=self.pos)
         return self.pos
     def legMove(self,ileg,x=0,z=0):
-        self.pos = legMove(ileg,x,z,self.pos)
+        self.pos = legPos(ileg,x=x,z=z,ref=self.pos)
         return self.pos
     def set(self,pos):
         self.pos=pos
@@ -55,58 +71,103 @@ class Robot:
     def get(self,):
         return self.pos
 
-up = bodyMove(z=40)
-down = bodyMove(z=-40)
-fwd = bodyMove(x=40)
-back = bodyMove(x=-40)
+up = bodyPos(z=40)
+down = bodyPos(z=-40)
+fwd = bodyPos(x=40)
+back = bodyPos(x=-40)
 
 title('Zero')
-set(zero)
+print set(zero)
 
 title('Base')
-set(base)
+print set(base)
 
 title('Up')
-set(up)
+print set(up)
 
 title('Fwd')
-set(fwd)
+print set(fwd)
 
 title('LeftRight')
-clear()
-mv(bodyMove(r=40))
-mv(bodyMove(r=-40))
-mv(base)
-go()
+print clear()
+print mv(bodyPos(r=-30))
+print mv(bodyPos(r=30))
+print mv(base)
+print go()
 
 title('Warm up')
-clear()
-set(base)
+print clear()
+print set(base)
 
-mv(fwd)
-mv(back)
-mv(base)
+print mv(fwd)
+print mv(back)
+print mv(base)
 
-mv(up)
-mv(down)
-mv(base)
+print mv(up)
+print mv(down)
+print mv(base)
 
-mv(bodyMove(r=20))
-mv(bodyMove(r=-20))
-mv(base)
+print mv(bodyPos(r=20))
+print mv(bodyPos(r=-20))
+print mv(base)
 
 r=Robot(base)
-mv(r.bodyMove(x=-40)) #back
-mv(r.legMove(0,z=40))
-mv(r.legMove(0,z=-40))
-mv(r.legMove(1,z=40))
-mv(r.legMove(1,z=-40))
-mv(r.bodyMove(x=+80)) #fwd
-mv(r.legMove(2,z=40))
-mv(r.legMove(2,z=-40))
-mv(r.legMove(3,z=40))
-mv(r.legMove(3,z=-40))
-mv(r.set(base)) #base
-go()
+print mv(r.bodyMove(x=-40)) #back
+print mv(r.legMove(0,z=40))
+print mv(r.legMove(0,z=-40))
+print mv(r.legMove(1,z=40))
+print mv(r.legMove(1,z=-40))
+print mv(r.bodyMove(x=+80)) #fwd
+print mv(r.legMove(2,z=40))
+print mv(r.legMove(2,z=-40))
+print mv(r.legMove(3,z=40))
+print mv(r.legMove(3,z=-40))
+print mv(r.set(base)) #base
+print go()
 
 
+title('WalkFlow1')
+h=20
+l=8
+w0= [0, 3*l,0,-1*l,0, 1*l,0,-3*l]
+w01=[0, 2*l,0,-2*l,0, 0*l,h, 0*l]
+w1= [0, 1*l,0,-3*l,0,-1*l,0, 3*l]
+w12=[0, 0*l,h, 0*l,0,-2*l,0, 2*l]
+w2= [0,-1*l,0, 3*l,0,-3*l,0, 1*l]
+w23=[0,-2*l,0, 2*l,h, 0*l,0, 0*l]
+w3= [0,-3*l,0, 1*l,0, 3*l,0,-1*l]
+w30=[h, 0*l,0, 0*l,0, 2*l,0,-2*l]
+
+spd=6
+print clear()
+print mv(bodyPos(w0),spd)
+print mv(bodyPos(w01),spd)
+print mv(bodyPos(w1),spd)
+print mv(bodyPos(w12),spd)
+print mv(bodyPos(w2),spd)
+print mv(bodyPos(w23),spd)
+print mv(bodyPos(w3),spd)
+print mv(bodyPos(w30),spd)
+print loop()
+print go()
+
+title('WalkFlow2')
+h=20
+l=8
+w0=  [0, 3*l,0,-3*l,0,-3*l,0, 3*l]
+w01= [0, 0*l,h, 0*l,h, 0*l,0, 0*l]
+w1=  [0,-3*l,0, 3*l,0, 3*l,0,-3*l]
+w10= [h, 0*l,0, 0*l,0, 0*l,h, 0*l]
+
+
+spd=6
+print clear()
+print mv(bodyPos(w0),spd)
+print mv(bodyPos(w01),spd)
+print mv(bodyPos(w1),spd)
+print mv(bodyPos(w10),spd)
+print loop()
+print go()
+
+title('Send Zero')
+send(set(zero))

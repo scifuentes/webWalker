@@ -3,15 +3,24 @@
 
 #include "webElements.hpp"
 
+#define TraceHandlers
+#ifdef TraceHandlers
+#define TRACE(foo) Serial.println(foo)
+#else
+#define TRACE(foo) ;
+#endif
+
 void printServerRequest(ESP8266WebServer& server)
 {
-  Serial.println(String("-URI: ") + server.uri());
-  Serial.println(String("-Method: ") + (server.method() == HTTP_GET ? "GET" : "POST"));
-  Serial.println(String("-Arguments: ")+ server.args());
+  #ifdef TraceHandlers
+  TRACE(String("-URI: ") + server.uri());
+  TRACE(String("-Method: ") + (server.method() == HTTP_GET ? "GET" : "POST"));
+  TRACE(String("-Arguments: ")+ server.args());
   for (uint8_t i = 0; i < server.args(); i++) 
   {
-    Serial.println(String("-- ") + server.argName(i) + ": " + server.arg(i));
+    TRACE(String("-- ") + server.argName(i) + ": " + server.arg(i));
   }
+  #endif
 }
 
 
@@ -41,20 +50,20 @@ public:
     void notFound()
     {
         server.send(404);
-        Serial.println("Unknown request");
+        TRACE("Unknown request");
         printServerRequest(server);
     }
 
     void root()
     {
         server.send(200, "text/html", mainWeb); //OK and sends back a the webpage
-        Serial.println("Root Handle");
+        TRACE("Root Handle");
     }
 
     void setServo(std::vector<Servo>& servos)
     {
       server.send(204);
-      Serial.println(__func__);
+      TRACE(__func__);
       //printServerRequest(server);
 
       for (uint8_t i = 0; i < server.args(); i++) 
@@ -64,7 +73,7 @@ public:
           int s = server.argName(i).substring(6).toInt();
           int v = server.arg(i).toInt();
           servos[s].write(v);
-          Serial.println(String("Servo[")+s+"] => "+v);
+          TRACE(String("Servo[")+s+"] => "+v);
         }
       } 
     }

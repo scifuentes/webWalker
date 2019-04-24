@@ -6,8 +6,8 @@
 #include "SoftTasks.hpp"
 #include "commandInterpreter.hpp"
 
-#define TraceServo
-#ifdef TraceServo
+//#define TraceServos
+#ifdef TraceServos
 #define TRACE(foo) Serial.println(foo)
 #else
 #define TRACE(foo) ;
@@ -275,8 +275,10 @@ std::vector<Servo>& setupServosMove(
   cmdHandlers.add("servos.move", std::bind(&cmd_moveServos, _1, _2, std::ref(sTasks)));
   cmdHandlers.add("mv.add", &cmd_moveAdd);
   cmdHandlers.add("mv.clear", [](){moveQueue.clear();});
-  cmdHandlers.add("mv.pause", [](){moveQueue.hold=true;});
   cmdHandlers.add("mv.go", [](){moveQueue.hold=false;});
+  cmdHandlers.add("mv.pause", [](){moveQueue.hold=true;});
+  cmdHandlers.add("mv.loop", [](){moveQueue.loop=true;});
+  cmdHandlers.add("mv.once", [](){moveQueue.loop=false;});
   cmdHandlers.add("mv.wait", &cmd_moveWait);
 
   return servos;

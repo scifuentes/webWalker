@@ -4,16 +4,23 @@
 #include <Servo.h> 
 #include "commandInterpreter.hpp"
 
+//#define TraceServo
+#ifdef TraceServo
+#define TRACE(foo) Serial.println(foo)
+#else
+#define TRACE(foo) ;
+#endif
+
 std::vector<Servo> servos(8);
 
 void cmd_setServo(const String& command, const std::vector<int>& spaces)
 {
-    Serial.println(String(__func__)+": "+command);
+    TRACE(String(__func__)+": "+command);
 
     int index = command.substring(spaces[0],spaces[1]).toInt();
     int value = command.substring(spaces[1],spaces[2]).toInt();
 
-    Serial.println(String(__func__)+": "+index+","+value);
+    TRACE(String(__func__)+": "+index+","+value);
 
     servos[index].write(value);
 
@@ -21,7 +28,7 @@ void cmd_setServo(const String& command, const std::vector<int>& spaces)
 
 void cmd_setServos(const String& command, const std::vector<int>& spaces)
 {
-    Serial.println(String(__func__)+": "+command);
+    TRACE(String(__func__)+": "+command);
     String sValues;
 
     int value;
@@ -31,7 +38,7 @@ void cmd_setServos(const String& command, const std::vector<int>& spaces)
         servos[i].write(sv.toInt());
         sValues+=" "+sv;
     }
-    Serial.println(String(__func__)+" values: "+sValues);
+    TRACE(String(__func__)+" values: "+sValues);
 
 }
 
