@@ -70,8 +70,9 @@ void setupWebServer(
 
   server.on("/setServo", [&](){handlers.setServo(servos);});
 
+
+  server.on("/zero", [&](){move_stop(); servos_zero();});
 /*
-  server.on("/zero", [&](){quad.setZero();});
   server.on("/one", [&](){quad.setBase();});
   server.on("/fwd", [&](){quad.stepFwd();});
   server.on("/stop", [&](){quad.stop();});

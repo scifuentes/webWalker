@@ -187,5 +187,31 @@ public:
     bool hold;
 };
 
+class SleepTask
+{
+public:
+    SleepTask(int rounds, int round_interval=100)
+    :rounds(rounds)
+    ,round_interval(round_interval)
+    ,counter(0)
+    {}
+
+    int run()
+    {
+        counter++;
+        if(counter<rounds)
+            return round_interval;
+        else
+        {
+            counter = 0;
+            return -1;
+        }
+
+    }
+protected:
+    int rounds;
+    int round_interval;
+    int counter;
+};
 
 #endif

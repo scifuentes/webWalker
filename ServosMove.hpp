@@ -15,6 +15,11 @@
 
 TaskQueue moveQueue(true);
 
+void move_stop()
+{
+    moveQueue.hold=true;
+}
+
 class ServoMove
 {
 public:
@@ -119,33 +124,31 @@ public:
         if(done)
             set();
 
-        if(!done)
+        int maxTravel = remTravel(maxTravelIndex);
+        if(maxTravel<=maxDelta)
         {
-            int maxTravel = remTravel(maxTravelIndex);
-            if(maxTravel<=maxDelta)
+            for(int i=0;i<servos.size();i++)
             {
-                for(int i=0;i<servos.size();i++)
-                {
-                    servos[i].write(fpos[i]);
-                    TRACE(String("Servo[")+i+"]="+fpos[i]+"!");
-                }
-                done = true;
+                servos[i].write(fpos[i]);
+                TRACE(String("Servo[")+i+"]="+fpos[i]+"!");
             }
-            else
+            done = true;
+        }
+        else
+        {
+            for(int i=0; i<servos.size(); i++)
             {
-                for(int i=0; i<servos.size(); i++)
-                {
-                    int delta = (maxDelta*remTravel(i))/maxTravel;
-                    int pos = servos[i].read();
-                    if(fpos[i]>pos)
-                        pos+=delta;
-                    else
-                        pos-=delta;
-                    servos[i].write(pos);
-                    TRACE(String("Servo[")+i+"]="+pos);
-                }
+                int delta = (maxDelta*remTravel(i))/maxTravel;
+                int pos = servos[i].read();
+                if(fpos[i]>pos)
+                    pos+=delta;
+                else
+                    pos-=delta;
+                servos[i].write(pos);
+                TRACE(String("Servo[")+i+"]="+pos);
             }
         }
+
 
         return !done;
     }
@@ -163,6 +166,8 @@ private:
     }
 
 };
+
+
 
 //================
 
@@ -243,6 +248,20 @@ void cmd_moveAdd(const String& command, const std::vector<int>& spaces)
 
 }
 
+void cmd_moveWait(const String& command, const std::vector<int>& spaces)
+{
+    TRACE(String(__func__)+": "+command);
+    String sValues;
+
+    int sleep = command.substring(spaces[0],spaces[1]).toInt();
+
+    TRACE(String(__func__)+" - sleep: "+sleep);    
+
+    moveQueue.addInt(std::bind(&SleepTask::run, 
+                                SleepTask(sleep)));
+
+}
+
 std::vector<Servo>& setupServosMove(
     CommandHandlers& cmdHandlers,
     SoftTasks& sTasks)
@@ -254,10 +273,11 @@ std::vector<Servo>& setupServosMove(
 
   cmdHandlers.add("servo.move", std::bind(&cmd_moveServo, _1, _2, std::ref(sTasks)));
   cmdHandlers.add("servos.move", std::bind(&cmd_moveServos, _1, _2, std::ref(sTasks)));
-  cmdHandlers.add("mv.add", std::bind(&cmd_moveAdd, _1, _2));
+  cmdHandlers.add("mv.add", &cmd_moveAdd);
   cmdHandlers.add("mv.clear", [](){moveQueue.clear();});
   cmdHandlers.add("mv.pause", [](){moveQueue.hold=true;});
   cmdHandlers.add("mv.go", [](){moveQueue.hold=false;});
+  cmdHandlers.add("mv.wait", &cmd_moveWait);
 
   return servos;
 

@@ -35,6 +35,12 @@ void cmd_setServos(const String& command, const std::vector<int>& spaces)
 
 }
 
+void servos_zero()
+{
+  for(auto& servo : servos)
+    servo.write(90);
+}
+
 std::vector<Servo>& setupServos(
     CommandHandlers& cmdHandlers)
 {
