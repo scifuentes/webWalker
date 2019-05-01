@@ -96,6 +96,7 @@ print mv(base)
 print go()
 
 title('Warm up')
+#little dance exercising different moves
 print clear()
 print set(base)
 
@@ -127,6 +128,7 @@ print go()
 
 
 title('WalkFlow1')
+#continuous body move, with three legs moving on groud and one leg transitionig from the back
 h=20
 l=8
 w0= [0, 3*l,0,-1*l,0, 1*l,0,-3*l]
@@ -152,6 +154,8 @@ print loop()
 print go()
 
 title('WalkFlow2')
+#continuous body move, with two legs moving on ground and two transitionig from the back
+
 h=20
 l=8
 w0=  [0, 3*l,0,-3*l,0,-3*l,0, 3*l]
@@ -169,5 +173,42 @@ print mv(bodyPos(w10),spd)
 print loop()
 print go()
 
-title('Send Zero')
-send(set(zero))
+
+title('TurnFlow2')
+#continuous turning with two legs on ground and two transitioning
+h=20
+l=8
+w0=  [0, 3*l,0, 3*l,0,-3*l,0, -3*l]
+w01= [0, 0*l,h, 0*l,h, 0*l,0, 0*l]
+w1=  [0,-3*l,0,-3*l,0, 3*l, 0,3*l]
+w10= [h, 0*l,0, 0*l,0, 0*l,h, 0*l]
+
+
+spd=6
+print clear()
+print mv(bodyPos(w0),spd)
+print mv(bodyPos(w01),spd)
+print mv(bodyPos(w1),spd)
+print mv(bodyPos(w10),spd)
+print loop()
+print go()
+
+
+title('Jump4')
+#it do not have enough power to lift off on the jump :(
+h=30
+l=8
+w0=  [ 0, 0*l, 0, 0*l, 0, 0*l, 0, 0*l]
+w01= [ h, 0*l, h, 0*l, h, 0*l, h, 0*l]
+w1=  [-h, 0*l,-h, 0*l,-h, 0*l,-h, 0*l]
+w10= [ 0, 0*l, 0, 0*l, 0, 0*l, 0, 0*l]
+
+
+spd=2
+print clear()
+print mv(bodyPos(w0),spd)
+print mv(bodyPos(w01),spd)
+print mv(bodyPos(w1),1000)
+print mv(bodyPos(w10),spd)
+print loop()
+print go()
