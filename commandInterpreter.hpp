@@ -18,6 +18,7 @@ struct CommandHandler
     String command;
     HandlerSignature method;
 };
+
 struct CommandHandlers
 {
     std::vector<CommandHandler> handlers;
